@@ -175,6 +175,40 @@ def get_winners(df, awards, cutoff=0.20):
                 print(f"{candidate} is the winner of the award")
                 break
 
+def get_nominees(df, awards, cutoff=0.05):
+    # changed cutoff
+    # banderas & others weren't recognized
+        # in json, their names were included with their movies and a negative reaction for NOT winning
+        # perhaps need to clump actors with movies
+        # will need a different approach from how we did winners
+
+    df_base = df[df["text"].str.contains('nominated|nominee|nominees')]
+
+    print(df_base.shape)
+
+    for award in awards:
+
+        df1 = get_award_tweets(df_base, award)
+        # print(df1["text"])
+        print(df1.shape)
+        print("why")
+
+        df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
+
+        counts = make_counts(df1_col)
+
+        # Remove ones that start with best
+        counts = counts[~counts.index.str.contains("Best")]
+
+        counts = counts[counts >= max(counts) * cutoff]
+
+        print(counts)
+        print("AWARD:", award['name'])
+        for candidate in list(counts.index):
+            if verify_person(candidate):
+                print(f"{candidate} is a nominee")
+        break # runs for only one award
+
 
 def get_nominees(df, awards, cutoff=0.0):
 
@@ -246,12 +280,9 @@ def main():
 
     # get_presenters(df, AWARDS[0])
 
-    # get_nominees(df, AWARDS)
-
     # get_awards(df)
 
     # get_host(df)
-
 
 '''
 
