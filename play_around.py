@@ -29,39 +29,39 @@ AWARDS = [
             {"name": "best actor",
              "medium": 0,
              "typeof": 0},
-            {"name": "best actor",
-             "medium": 0,
-             "typeof": 1},
-            {"name": "best actor",
-             "medium": 1,
-             "typeof": 0},
-            {"name": "best actor",
-             "medium": 1,
-             "typeof": 1},
-            {"name": "best actress",
-             "medium": 0,
-             "typeof": 0},
-            {"name": "best actress",
-             "medium": 0,
-             "typeof": 1},
-            {"name": "best actress",
-             "medium": 1,
-             "typeof": 0},
-            {"name": "best actress",
-             "medium": 1,
-             "typeof": 1},
-            {"name": "best supporting actor|best actor in supporting role",
-             "medium": 1,
-             "typeof": 2},
-            {"name": "best supporting actor|best actor in supporting role",
-             "medium": 0,
-             "typeof": 2},
-            {"name": "best supporting actress|best actress in supporting role",
-             "medium": 1,
-             "typeof": 2},
-            {"name": "best supporting actress|best actress in supporting role",
-             "medium": 0,
-             "typeof": 2},
+            # {"name": "best actor",
+            #  "medium": 0,
+            #  "typeof": 1},
+            # {"name": "best actor",
+            #  "medium": 1,
+            #  "typeof": 0},
+            # {"name": "best actor",
+            #  "medium": 1,
+            #  "typeof": 1},
+            # {"name": "best actress",
+            #  "medium": 0,
+            #  "typeof": 0},
+            # {"name": "best actress",
+            #  "medium": 0,
+            #  "typeof": 1},
+            # {"name": "best actress",
+            #  "medium": 1,
+            #  "typeof": 0},
+            # {"name": "best actress",
+            #  "medium": 1,
+            #  "typeof": 1},
+            # {"name": "best supporting actor|best actor in supporting role",
+            #  "medium": 1,
+            #  "typeof": 2},
+            # {"name": "best supporting actor|best actor in supporting role",
+            #  "medium": 0,
+            #  "typeof": 2},
+            # {"name": "best supporting actress|best actress in supporting role",
+            #  "medium": 1,
+            #  "typeof": 2},
+            # {"name": "best supporting actress|best actress in supporting role",
+            #  "medium": 0,
+            #  "typeof": 2},
 
             # ERROR: THESE DONT WORK GREAT, MOVIE TITLES ARE WEIRD
             # {"name": "best film|best drama",
@@ -77,9 +77,9 @@ AWARDS = [
             #  "medium": 1,
             #  "typeof": 1},
 
-            {"name": "best director",
-             "medium": 0,
-             "typeof": 2},
+            # {"name": "best director",
+            #  "medium": 0,
+            #  "typeof": 2},
 
 
         ]
@@ -100,6 +100,8 @@ def get_host(df, cutoff=0.70):
     for candidate in list(counts.index):
         if verify_person(candidate):
             hosts.append(candidate.title())
+        if len(hosts) >= 2:
+            break
 
 
     print(counts)
@@ -109,28 +111,44 @@ def get_host(df, cutoff=0.70):
 
 
 def get_awards(df):
-    # Doesnt work too well
 
-    df1 = df[df["text"].str.contains('the winner is | goes to | won| the award')]
-    df1["ner_host"] = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
+    # df1 = df[df["text"].str.contains('the winner is | goes to | won|the award|went to')]
 
-    counts = pd.Series(Counter(chain.from_iterable(x for x in df1["ner_host"])))
+    # "Goes to" structure:
 
-    counts = counts[counts.index.str.contains('best|Best')]
+    df_goes = df[df["text"].str.contains('goes to')]
+    df_goes_groups = df_goes["text"].str.extract('([^,]+) for ([^,]+) goes to ([^,]+)')
 
-    counts = counts[counts > 1]
+    candidates = df_goes_groups[~df_goes_groups[1].isnull()][[1]]
 
-    print(counts.index)
+    candidates.columns = ["goes"]
 
-    print(counts.sort_values(ascending=False))
+    candidates = candidates[candidates["goes"].str.contains('$award|^best')]
+    candidates["goes_count"] = candidates["goes"].str.split().apply(len)
+
+    candidates = candidates[candidates["goes_count"] > 3]
+
+    candidates = candidates[candidates["goes_count"] <= 12]
+
+    # Assume number (for now)
+
+    counts = candidates["goes"].value_counts(ascending=False)
+
+    print(counts)
+
+    '''
+    MISSING:
+    - picking the final list of winners
+    - how to deal with "repeated" awards (awards that are quite similar in name)
+    '''
 
 
 
 
-def get_winners(df, awards, cutoff=0.40):
+def get_winners(df, awards, cutoff=0.20):
     # Works pretty well
 
-    df_base = df[df["text"].str.contains('win|won')]
+    df_base = df[df["text"].str.contains('win|won|goes to')]
 
     print(df_base.shape)
 
@@ -158,11 +176,45 @@ def get_winners(df, awards, cutoff=0.40):
                 break
 
 
+def get_nominees(df, awards, cutoff=0.0):
+
+
+    df_base = df[df["text"].str.contains("win|won|goes to|nom|lost|didn't|should")]
+
+    print(df_base.shape)
+
+    for award in awards:
+
+        df1 = get_award_tweets(df_base, award)
+        # print(df1["text"])
+        print(df1.shape)
+        print("why")
+
+        df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
+
+        counts = make_counts(df1_col)
+
+        # Remove ones that start with best
+        counts = counts[~counts.index.str.contains("best")]
+
+        counts = counts[counts >= max(counts) * cutoff + 1]
+
+        print(counts)
+
+        # for candidate in list(counts.index):
+        #     if verify_person(candidate):
+        #         print(f"{candidate} is the winner of the award")
+        #         break
+
 
 def get_presenters(df, award, cutoff=0.50):
 
 
     df1 = df[df["text"].str.contains('present')]
+
+    df1 = df1[~df1["text"].str.contains("represent")]
+
+    df1.to_csv("presenters.csv", index=False)
 
     print(df1.shape)
 
@@ -190,9 +242,11 @@ def main():
 
     df = df[~df["text"].str.contains("predict")]
 
-    # get_presenters(df, AWARDS[2])
+    get_awards(df)
 
-    get_winners(df, AWARDS)
+    # get_presenters(df, AWARDS[0])
+
+    # get_nominees(df, AWARDS)
 
     # get_awards(df)
 
