@@ -140,9 +140,18 @@ def get_awards(df):
     MISSING:
     - picking the final list of winners
     - how to deal with "repeated" awards (awards that are quite similar in name)
+    - Filtering "non-useful" awards (might be making too many assumptions with this tho)
     '''
 
+    awards = []
+    for candidate in list(counts.index):
+        # if len(candidate.split()) <= 11 and len(candidate.split()) > 3:
+        #     if candidate not in awards:
+        awards.append(candidate)
 
+    awards = awards[0:min(len(awards), 27)]
+
+    return awards
 
 
 def get_winners(df, awards, cutoff=0.20):
@@ -150,30 +159,55 @@ def get_winners(df, awards, cutoff=0.20):
 
     df_base = df[df["text"].str.contains('win|won|goes to')]
 
-    print(df_base.shape)
+    df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
+    df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
+    df['text'] = df['text'].str.replace('tv', 'television', case=False)
 
-    for award in awards:
+    df_base = df[df["text"].str.contains('win|won|goes to')]
 
-        df1 = get_award_tweets(df_base, award)
+
+    for award_name, awards_dict in awards_dict.items():
+
+        print(awards_dict)
+
+        df1 = get_award_tweets(df_base, awards_dict)
         # print(df1["text"])
         print(df1.shape)
         print("why")
+
 
         df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
 
         counts = make_counts(df1_col)
 
         # Remove ones that start with best
-        counts = counts[~counts.index.str.contains("Best")]
+        counts = counts[~counts.index.str.contains("best|award")]
 
         counts = counts[counts >= max(counts) * cutoff]
 
         print(counts)
 
+        winner = ""
         for candidate in list(counts.index):
-            if verify_person(candidate):
-                print(f"{candidate} is the winner of the award")
-                break
+
+            if "performance" in award_name or "award" in award_name:
+
+                # GOTTA EMBED HERE IF A THING OR IF A PERSON
+                if verify_person(candidate):
+                    print(f"{candidate} is the winner of the award")
+                    winner = candidate
+                    break
+            else:
+                 # GOTTA EMBED HERE IF A THING OR IF A PERSON
+                if verify_film_tv(candidate):
+                    print(f"{candidate} is the winner of the award")
+                    winner = candidate
+                    break               
+
+        winners[award_name] = winner
+
+    return winners
+
 
 def get_nominees(df, awards, cutoff=0.05):
     # changed cutoff
@@ -208,37 +242,6 @@ def get_nominees(df, awards, cutoff=0.05):
             if verify_person(candidate):
                 print(f"{candidate} is a nominee")
         break # runs for only one award
-
-
-def get_nominees(df, awards, cutoff=0.0):
-
-
-    df_base = df[df["text"].str.contains("win|won|goes to|nom|lost|didn't|should")]
-
-    print(df_base.shape)
-
-    for award in awards:
-
-        df1 = get_award_tweets(df_base, award)
-        # print(df1["text"])
-        print(df1.shape)
-        print("why")
-
-        df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
-
-        counts = make_counts(df1_col)
-
-        # Remove ones that start with best
-        counts = counts[~counts.index.str.contains("best")]
-
-        counts = counts[counts >= max(counts) * cutoff + 1]
-
-        print(counts)
-
-        # for candidate in list(counts.index):
-        #     if verify_person(candidate):
-        #         print(f"{candidate} is the winner of the award")
-        #         break
 
 
 def get_presenters(df, award, cutoff=0.50):
