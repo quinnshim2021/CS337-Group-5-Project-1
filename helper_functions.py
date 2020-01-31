@@ -58,43 +58,44 @@ DRAMA = 1
 COMEDY = 2
 
 def get_query_dict(award_name):
+    # Returns query string AND if the award has "weird" noun structure (True if it weird noun)
 
     if "best performance by an actress" in award_name:
         if "supporting role" in award_name:
-            return "best supporting actress|best actress in supporting role"
+            return "best supporting actress|best actress in supporting role", False
         else:
-            return "best actress|best performance by an actress"
+            return "best actress|best performance by an actress", False
     elif "best performance by an actor" in award_name:
         if "supporting role" in award_name:
-            return "best supporting actor|best actor in supporting role"
+            return "best supporting actor|best actor in supporting role", False
         else:
-            return "best actor|best performance by an actor"
+            return "best actor|best performance by an actor", False
     elif "best motion picture" in award_name:
         if "animated" in award_name:
-            return "(?=.*best)(?=.*animated)"
+            return "(?=.*best)(?=.*animated)", True
         elif "foreign" in award_name:
-            return "(?=.*best)(?=.*foreign)"
+            return "(?=.*best)(?=.*foreign)", True
         else:
-            return "best film|best motion picture|best picture"
+            return "best film|best motion picture|best picture", True
     elif "best screenplay" in award_name:
-        return "best screenplay"
+        return "best screenplay", True
     elif "director" in award_name:
-        return "director"
+        return "director", False
     elif "score" in award_name:
-        return "best score|best original score"
+        return "best score|best original score", True
     elif "song" in award_name:
-        return "best song|best original song"
+        return "best song|best original song", True
     elif "series" in award_name:
         if "limited" in award_name or "mini-series" in award_name:
-            return "limited|mini-series|miniseries|television film|motion picture for television"
+            return "limited|mini-series|miniseries|television film|motion picture for television", True
         else:
-            return "best television|best series"
+            return "best television|best series", True
     elif 'cecil' in award_name:
-        return 'cecil b. demille award'
+        return 'cecil b. demille', False
     elif "animated" in award_name:
-        return "(?=.*best)(?=.*animated)"
+        return "(?=.*best)(?=.*animated)", True
     elif "foreign" in award_name:
-        return "(?=.*best)(?=.*foreign)"
+        return "(?=.*best)(?=.*foreign)", True
 
 
 def get_medium_dict(award_name):
@@ -119,8 +120,10 @@ def get_typeof_dict(award_name):
 
 
 def make_award_dict(award_name):
+    query_name, weird_noun = get_query_dict(award_name)
     award = {"string": award_name,
-             "query_name": get_query_dict(award_name),
+             "query_name": query_name,
+             "weird_noun": weird_noun,
              "typeof": get_typeof_dict(award_name),
              "medium": get_medium_dict(award_name)}
 
@@ -139,7 +142,7 @@ def get_medium_tweets(df, medium):
     if medium == FILM:
         return df[df["text"].str.contains('movie|film|picture')]
     elif medium == TV:
-        return df[df["text"].str.contains('tv|television|series|show')]
+        return df[df["text"].str.contains('television|series|show')]
     elif medium == LIMITED_SERIES:
         return df[df["text"].str.contains("limited|mini-series|miniseries|television film|motion picture for television")]
     elif medium == NONE:

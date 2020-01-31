@@ -96,9 +96,12 @@ def get_awards(year):
     for candidate in list(counts.index):
         # if len(candidate.split()) <= 11 and len(candidate.split()) > 3:
         #     if candidate not in awards:
-        awards.append(candidate)
+        if "best" in candidate.split()[0] or "award" in candidate.split()[-1]:
+            awards.append(candidate)
 
     awards = awards[0:min(len(awards), 27)]
+
+    print(awards)
 
     return awards
 
@@ -140,51 +143,70 @@ def get_winner(year):
     df["text"] = df["text"].str.lower()
     df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
     df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
-    df['text'] = df['text'].str.replace('tv', 'television', case=False)
+    df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
 
     df_base = df[df["text"].str.contains('win|won|goes to')]
 
+    for award_name, award_dict in awards_dict.items():
 
-    for award_name, awards_dict in awards_dict.items():
+        print(award_dict)
 
-        print(awards_dict)
-
-        df1 = get_award_tweets(df_base, awards_dict)
+        df1 = get_award_tweets(df_base, award_dict)
         # print(df1["text"])
         print(df1.shape)
-        print("why")
 
 
-        df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
+        # if award_dict["weird_noun"]:
+        print("Weird noun case")
 
-        counts = make_counts(df1_col)
+        df_goes = df1[df1["text"].str.contains('win|won')]
+        df_goes_groups = df_goes["text"].str.extract('([^,]+) (win|won) ([^,]+)')
 
-        # Remove ones that start with best
-        counts = counts[~counts.index.str.contains("best|award")]
+        candidates = df_goes_groups[~df_goes_groups[1].isnull()][[0]]
 
-        counts = counts[counts >= max(counts) * cutoff]
+        candidates.columns = ["won"]
+
+        # candidates = candidates[candidates["goes"].str.contains('$award|^best')]
+        candidates["won_count"] = candidates["won"].str.split().apply(len)
+
+        candidates = candidates[candidates["won_count"] <= 8]
+
+        counts = candidates["won"].value_counts(ascending=False)
 
         print(counts)
+
+        # else:
+
+        #     df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
+
+        #     counts = make_counts(df1_col)
+
+        #     # Remove ones that start with best
+        #     counts = counts[~counts.index.str.contains("best|award")]
+
+        #     counts = counts[counts >= max(counts) * cutoff]
+
+        #     print(counts)
 
         winner = ""
         for candidate in list(counts.index):
 
-            if "performance" in award_name or "award" in award_name:
-
-                # GOTTA EMBED HERE IF A THING OR IF A PERSON
-                if verify_person(candidate):
-                    print(f"{candidate} is the winner of the award")
-                    winner = candidate
-                    break
-            else:
+            if award_dict["weird_noun"]:
                  # GOTTA EMBED HERE IF A THING OR IF A PERSON
                 if verify_film_tv(candidate):
                     print(f"{candidate} is the winner of the award")
                     winner = candidate
-                    break               
+                    break
+            else:
+                  # GOTTA EMBED HERE IF A THING OR IF A PERSON
+                if verify_person(candidate):
+                    print(f"{candidate} is the winner of the award")
+                    winner = candidate
+                    break          
 
         winners[award_name] = winner
 
+    print(winners)
     return winners
 
 def get_presenters(year):
