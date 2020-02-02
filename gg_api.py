@@ -9,6 +9,10 @@ OFFICIAL_AWARDS_1819 = ['best motion picture - drama', 'best motion picture - mu
 import pandas as pd
 import re
 
+#
+import spacy
+#
+
 from helper_functions import *
 
 
@@ -206,6 +210,86 @@ def get_presenters(year):
         presenters = {award: [] for award in OFFICIAL_AWARDS_1315}
     else:
         presenters = {award: [] for award in OFFICIAL_AWARDS_1819}
+
+    awards_dict = {award: make_award_dict(award) for award in list(presenters.keys())}
+
+    FILE_NAME = "gg"+ str(year) + ".json"
+
+    try:
+        df = pd.read_json(FILE_NAME)
+    except:
+        df = pd.read_json(FILE_NAME, lines=True)
+
+    print(list(df))
+
+    # holds some of the awards so I can just test a few at a time
+    test_awards = ['best television series - musical or comedy']
+
+    television_synonyms = ["television", "tv", "television series", "tv series", "television show", "tv show"]
+    motion_picture_synonyms = ["motion picture", "movie", "film"]
+    nlp = spacy.load("en_core_web_sm")
+
+    test_awards_dict = {award: {} for award in test_awards} # need to change to presenters later
+
+    for tweet in df['text']:
+        tweet = tweet.lower()
+        if "represent" in tweet or "representation" in tweet or "next year" in tweet or "last year" in tweet:
+                continue
+        for award in test_awards:
+            award_words = award.split()
+            try:
+                award_words.remove('-')
+                award_words.remove('or')
+            except:
+                pass
+            if re.search('(next year|last year|representation)', tweet) is None: # need to find phrases like these
+                for word in award_words:
+                    if word == "television":
+                        award_words.remove("television")
+                        if any([kw in tweet for kw in television_synonyms]):
+                            if all([kw in tweet for kw in award_words]):
+                                t = nlp(tweet)
+                                for person in t.ents:
+                                    if person.label_ == "PERSON":
+                                        if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
+                                            poss_host = person.text.lower()
+                                            if poss_host not in test_awards_dict[award]:
+                                                test_awards_dict[award][poss_host] = 1
+                                            else:
+                                                test_awards_dict[award][poss_host] += 1
+    # prints out the presenters for each award
+    {k: v for k, v in sorted(test_awards_dict["best television series - musical or comedy"].items(), key=lambda item: item[1])}
+    for award in test_awards_dict: # print two top presenters
+        i = 0
+        for presenter in test_awards_dict[award]:
+            print(award, presenter)
+            i+=1
+            if i == 2:
+                break
+            
+                                            # else:
+                                            #     test_awards_dict[award]
+                    # elif word == "picture":
+                    #     award_words.remove("picture")
+                    #     if any([kw in tweet for kw in motion_picture_synonyms]):
+                    #         if all([kw in tweet for kw in award_words]):
+                    #             t = nlp(tweet)
+                    #             for person in t.ents:
+                    #                 if person.label_ == "PERSON":
+                    #                     if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
+                    #                         poss_host = person.text.lower()
+                    #                         if poss_host not in presenters_final:
+                    #                             presenters_final[poss_host] = 1
+                    #                         else:
+                    #                             presenters_final[poss_host] += 1
+    # {k: v for k, v in sorted(test_awards_dict.items(), key=lambda item: item[1])}
+    # i = 0
+    # for presenter in test_awards_dict: # print two top presenters
+    #     print(presenter, test_awards_dict[presenter])
+    #     i+=1
+    #     if i == 2:
+    #         break
+
     return presenters
 
 def pre_ceremony():
@@ -305,8 +389,13 @@ def main():
     # Your code here
 
     # get_winner(2020)
+<<<<<<< HEAD
     extra_credit(2015)
 
+=======
+    #get_awards(2020)
+    get_presenters(2020)
+>>>>>>> 5aeca9df05755072467851d594f07b9fc17c0aa9
     return
 
 if __name__ == '__main__':
