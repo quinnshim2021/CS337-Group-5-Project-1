@@ -64,13 +64,18 @@ def get_awards(year):
     except:
         df = pd.read_json(FILE_NAME, lines=True)
 
-    df["text"] = df["text"].str.lower()
+    df["text"] = df["text"].str.lower() 
+    df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
+    df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
+    df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
     df_goes = df[df["text"].str.contains('goes to')]
-    df_goes_groups = df_goes["text"].str.extract('([^,]+) for ([^,]+) goes to ([^,]+)')
+    df_goes_groups = df_goes["text"].str.extract('([^,]+) goes to ([^,]+)')
 
-    candidates = df_goes_groups[~df_goes_groups[1].isnull()][[1]]
+    candidates = df_goes_groups[~df_goes_groups[0].isnull()][[0]]
 
     candidates.columns = ["goes"]
+
+    candidates["goes"] = candidates.apply(func= lambda row: row['goes'].split('for')[0], axis=1)
 
     candidates = candidates[candidates["goes"].str.contains('$award|^best')]
     candidates["goes_count"] = candidates["goes"].str.split().apply(len)
@@ -83,23 +88,26 @@ def get_awards(year):
 
     counts = candidates["goes"].value_counts(ascending=False)
 
-    print(counts)
+    cutoff = 0.10
+    counts = counts[counts >= max(counts) * cutoff]
 
-    '''
-    MISSING:
-    - picking the final list of winners
-    - how to deal with "repeated" awards (awards that are quite similar in name)
-    - Filtering "non-useful" awards (might be making too many assumptions with this tho)
-    '''
+    print(counts)
 
     awards = []
     for candidate in list(counts.index):
         # if len(candidate.split()) <= 11 and len(candidate.split()) > 3:
         #     if candidate not in awards:
         if "best" in candidate.split()[0] or "award" in candidate.split()[-1]:
-            awards.append(candidate)
-
-    awards = awards[0:min(len(awards), 27)]
+            if candidate not in awards:
+                awards.append(candidate)
+        # if "actress" in candidate:
+        #     inverse = candidate.replace("actress", "actor")
+        #     if inverse not in awards:
+        #         awards.append(inverse)
+        # elif "actor" in candidate:
+        #     inverse = candidate.replace("actor", "actress")
+        #     if inverse not in awards:
+        #         awards.append(inverse)
 
     print(awards)
 
@@ -149,59 +157,39 @@ def get_winner(year):
 
     for award_name, award_dict in awards_dict.items():
 
-        print(award_dict)
-
         df1 = get_award_tweets(df_base, award_dict)
-        # print(df1["text"])
-        print(df1.shape)
 
-
-        # if award_dict["weird_noun"]:
-        print("Weird noun case")
-
-        df_goes = df1[df1["text"].str.contains('win|won')]
-        df_goes_groups = df_goes["text"].str.extract('([^,]+) (win|won) ([^,]+)')
-
-        candidates = df_goes_groups[~df_goes_groups[1].isnull()][[0]]
+        df_goes = df1[df1["text"].str.contains('goes to')]
+        df_goes_groups = df_goes["text"].str.extract('([^,]+) (goes to) ([^,]+)')
+        candidates = df_goes_groups[~df_goes_groups[2].isnull()][[2]]
 
         candidates.columns = ["won"]
+        # candidates["won"] = candidates['won'].str.replace('[^\w\s]','')
+        candidates["won"] = candidates.apply(func= lambda row: row['won'].split('for')[0], axis=1)
 
         # candidates = candidates[candidates["goes"].str.contains('$award|^best')]
-        candidates["won_count"] = candidates["won"].str.split().apply(len)
-
-        candidates = candidates[candidates["won_count"] <= 8]
-
+        candidates["won_len"] = candidates["won"].str.split().apply(len)
+        candidates = candidates[candidates["won_len"] <= 8]
         counts = candidates["won"].value_counts(ascending=False)
 
         print(counts)
-
-        # else:
-
-        #     df1_col = df1.apply(func= lambda row: get_chunks(row["text"]), axis=1)
-
-        #     counts = make_counts(df1_col)
-
-        #     # Remove ones that start with best
-        #     counts = counts[~counts.index.str.contains("best|award")]
-
-        #     counts = counts[counts >= max(counts) * cutoff]
-
-        #     print(counts)
 
         winner = ""
         for candidate in list(counts.index):
 
             if award_dict["weird_noun"]:
                  # GOTTA EMBED HERE IF A THING OR IF A PERSON
-                if verify_film_tv(candidate):
-                    print(f"{candidate} is the winner of the award")
-                    winner = candidate
+                answer = verify_film_tv(candidate, award_dict["medium"], year)
+                if answer:
+                    print(f"{answer} is the winner of the award")
+                    winner = answer
                     break
             else:
                   # GOTTA EMBED HERE IF A THING OR IF A PERSON
-                if verify_person(candidate):
-                    print(f"{candidate} is the winner of the award")
-                    winner = candidate
+                answer = verify_person(candidate)
+                if answer:
+                    print(f"{answer} is the winner of the award")
+                    winner = answer
                     break          
 
         winners[award_name] = winner
@@ -229,6 +217,85 @@ def pre_ceremony():
     print("Pre-ceremony processing complete.")
     return
 
+def extra_credit(year):
+
+    FILE_NAME = "gg"+ str(year) + ".json"
+    cutoff = 0.50
+
+    try:
+        df = pd.read_json(FILE_NAME)
+    except:
+        df = pd.read_json(FILE_NAME, lines=True)
+
+    print(list(df))
+
+    df["text"] = df["text"].str.lower()
+    df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
+    df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
+    df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
+
+
+    # Additional awards
+    df_awards = df[df["text"].str.contains('goes to')]
+    df_awards = df_awards["text"].str.extract('([^,]+) goes to ([^,]+)')
+
+    df_awards = df_awards[~df_awards[0].isnull()]
+    df_awards = df_awards[~df_awards[1].isnull()]
+
+    df_awards.columns = ["award_part", "winner_part"]
+    df_awards["award_part"] = df_awards.apply(func= lambda row: row['award_part'].split(' for ')[0], axis=1)
+    df_awards = df_awards[df_awards["award_part"].str.contains('$award|^best')]
+
+    # Best dressed
+    df_dressed = df_awards[df_awards["award_part"].str.contains('dress|outfit')]
+    df_dressed["winner"] = df_dressed.apply(func= lambda row: verify_person(row['winner_part'], threshold=50), axis=1)
+    df_dressed = df_dressed[~df_dressed["winner"].isnull()] 
+
+    counts = df_dressed["winner"].value_counts(ascending=False)
+
+    print(counts)
+
+    best_dressed = ""
+    for candidate in list(counts.index):
+        answer = verify_person(candidate)
+        if answer:
+            print(f"{answer} is the winner of the award")
+            best_dressed = answer
+            break          
+
+    # Best Speech
+    df_speech = df_awards[df_awards["award_part"].str.contains('speech')]
+    df_speech["winner"] = df_speech.apply(func= lambda row: verify_person(row['winner_part'], threshold=50), axis=1)
+    df_speech = df_speech[~df_speech["winner"].isnull()] 
+
+    counts = df_speech["winner"].value_counts(ascending=False)
+
+    print(counts)
+
+    best_speech = ""
+    for candidate in list(counts.index):
+        answer = verify_person(candidate)
+        if answer:
+            print(f"{answer} is the winner of the award")
+            best_dressed = answer
+            break    
+
+    # Extra awards
+    award_words = ["actress", "actor", "television", "film", "director", "screenplay",
+            "score", "song", "pic", "movie", "series", "comedy", "musical", "drama",
+            "direct", "anima", "foreign", "dress", "speech", "outfit"]
+
+
+    # Get award name
+    df_awards = df_awards[~df_awards["award_part"].str.contains('|'.join(award_words))] 
+    df_awards["winner"] = df_awards.apply(func= lambda row: verify_person(row['winner_part'], threshold=50), axis=1)
+    df_awards = df_awards[~df_awards["winner"].isnull()]  
+
+    print(df_awards)
+    print(df_awards.shape)
+
+
+
 def main():
     '''This function calls your program. Typing "python gg_api.py"
     will run this function. Or, in the interpreter, import gg_api
@@ -238,7 +305,7 @@ def main():
     # Your code here
 
     # get_winner(2020)
-    get_awards(2020)
+    extra_credit(2015)
 
     return
 

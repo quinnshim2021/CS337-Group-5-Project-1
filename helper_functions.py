@@ -12,6 +12,8 @@ NLP = spacy.load("en_core_web_sm")
 
 from spacy.lang.en.stop_words import STOP_WORDS
 
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 
 NOT_USEFUL_NOUNS = set()
@@ -99,7 +101,7 @@ def get_query_dict(award_name):
 
 
 def get_medium_dict(award_name):
-    if "motion picture" in award_name:
+    if "motion picture" in award_name or "film" in award_name:
         return FILM
     elif "series" in award_name:
         if "limited" in award_name or "mini-series" in award_name:
@@ -174,24 +176,45 @@ def get_award_tweets(df, award):
     return df1
 
 
-def verify_person(person_name):
+def verify_person(person_name, threshold=60):
     # Go through list, find person with same name(ish)
-    return any([person["name"].lower()  == person_name for person in IA.search_person(person_name) ])
+    people = IA.search_person(person_name)
+
+    if people:
+        highest = process.extractOne(person_name, [person["name"].lower() for person in people], scorer=fuzz.token_set_ratio)
+        if highest[1] > threshold:
+            return highest[0]
+    return None
 
 
-def verify_film_tv(title):
+def verify_film_tv(title, medium, year, threshold=60):
     movies = IA.search_movie(title)
 
-    # Go through list, find movie with same title(ish)
-    index = [i for i, movie in enumerate(movies) if movie["title"].lower() == title]
+    # print(movies)
 
-    if len(index) == 0:
-        # If none, return false and null
-        return False
-    else:
-        # If you do find one, return what it is
-        return movies[index[0]]["kind"]
- 
+    # Filter titles from the same medium
+    if movies:
+        if medium == TV:
+            movies = [movie for movie in movies if movie["kind"] == "tv series"]
+        elif medium == FILM:
+            movies = [movie for movie in movies if movie["kind"] == "movie"]
+        elif medium == LIMITED_SERIES:
+            movies = [movie for movie in movies if movie["kind"] == "tv miniseries" or movie["kind"] == "tv movie"]
+        else:
+            print("medium not tv nor film nor limited series, might be weird results")
+
+    # Filter titles from the same year (or year before)
+    if movies:
+        movies = [movie for movie in movies if "year" in movie and movie["year"] == (int(year) - 1)]
+
+
+    # print(movies)
+
+    if movies:
+        highest = process.extractOne(title, [movie["title"].lower() for movie in movies], scorer=fuzz.token_set_ratio)
+        if highest[1] > threshold:
+            return highest[0]
+    return None    
 
 
 
