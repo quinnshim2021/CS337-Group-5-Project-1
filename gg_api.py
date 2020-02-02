@@ -9,6 +9,10 @@ OFFICIAL_AWARDS_1819 = ['best motion picture - drama', 'best motion picture - mu
 import pandas as pd
 import re
 
+#
+import spacy
+#
+
 from helper_functions import *
 
 
@@ -218,6 +222,79 @@ def get_presenters(year):
         presenters = {award: [] for award in OFFICIAL_AWARDS_1315}
     else:
         presenters = {award: [] for award in OFFICIAL_AWARDS_1819}
+
+    awards_dict = {award: make_award_dict(award) for award in list(presenters.keys())}
+
+    FILE_NAME = "gg"+ str(year) + ".json"
+
+    try:
+        df = pd.read_json(FILE_NAME)
+    except:
+        df = pd.read_json(FILE_NAME, lines=True)
+
+    print(list(df))
+
+    # holds some of the awards so I can just test a few at a time
+    test_awards = ['best television series - musical or comedy']
+
+    television_synonyms = ["television", "tv", "television series", "tv series", "television show", "tv show"]
+    motion_picture_synonyms = ["motion picture", "movie", "film"]
+    nlp = spacy.load("en_core_web_sm")
+
+    # presenters: key = award name, value = list
+    # for award in presenters:
+
+    # might change this later to be more efficient
+    presenters_final = {}
+    for tweet in df['text']:
+        tweet = tweet.lower()
+        for award in test_awards:
+            award_words = award.split()
+            if "represent" in award_words or "representation" in award_words or "next year" in award_words or "last year" in award_words:
+                continue
+            # may need to have a try here
+            try:
+                award_words.remove('-')
+                award_words.remove('or')
+            except:
+                pass
+            if re.search('(next year|last year|representation)', tweet) is None: # need to find phrases like these
+                for word in award_words:
+                    if word == "television":
+                        award_words.remove("television")
+                        if any([kw in tweet for kw in television_synonyms]):
+                            if all([kw in tweet for kw in award_words]):
+                                t = nlp(tweet)
+                                for person in t.ents:
+                                    if person.label_ == "PERSON":
+                                        if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes"]:
+                                            poss_host = person.text.lower()
+                                            if poss_host not in presenters_final:
+                                                presenters_final[poss_host] = 1
+                                            else:
+                                                presenters_final[poss_host] += 1
+                    elif word == "picture":
+                        award_words.remove("picture")
+                        if any([kw in tweet for kw in motion_picture_synonyms]):
+                            if all([kw in tweet for kw in award_words]):
+                                t = nlp(tweet)
+                                for person in t.ents:
+                                    if person.label_ == "PERSON":
+                                        if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes"]:
+                                            poss_host = person.text.lower()
+                                            if poss_host not in presenters_final:
+                                                presenters_final[poss_host] = 1
+                                            else:
+                                                presenters_final[poss_host] += 1
+    {k: v for k, v in sorted(presenters_final.items(), key=lambda item: item[1])}
+    i = 0
+    for key in presenters_final:
+        print(key)
+        i+= 1
+        if i == 2:
+            break
+
+
     return presenters
 
 def pre_ceremony():
@@ -238,8 +315,8 @@ def main():
     # Your code here
 
     # get_winner(2020)
-    get_awards(2020)
-
+    #get_awards(2020)
+    get_presenters(2020)
     return
 
 if __name__ == '__main__':
