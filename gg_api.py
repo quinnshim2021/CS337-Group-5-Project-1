@@ -235,20 +235,30 @@ def get_presenters(year):
     print(list(df))
 
     # holds some of the awards so I can just test a few at a time
-    test_awards = ['best television series - musical or comedy']
 
     television_synonyms = ["television", "tv", "television series", "tv series", "television show", "tv show"]
     motion_picture_synonyms = ["motion picture", "movie", "film"]
     nlp = spacy.load("en_core_web_sm")
 
-    test_awards_dict = {award: {} for award in test_awards} # need to change to presenters later
+    test_awards_dict = {award: {} for award in presenters} # need to change to presenters later
+    #presenter_words = ['present', 'gave', 'giving', 'give', 'announce', 'read', 'introduce', 'host', 'will host']
 
+    # filter tweets by presenter_words
+        # do if re.search(next year...)
+            # if word=='television' and everything after taht 
+                #-> allow me to affiliate presenters with awards
+
+    # do same thing as github but extract prsetner is just nlp with ents
+
+    # kind of working...
+    # imdb check is making it a lot slower
     for tweet in df['text']:
         tweet = tweet.lower()
-        if "represent" in tweet or "representation" in tweet or "next year" in tweet or "last year" in tweet:
-                continue
-        for award in test_awards:
+        for award in presenters:
             award_words = award.split()
+            # may want to add re_presenters here
+            # if "represent" in award_words or "representation" in award_words or "next year" in award_words or "last year" in award_words:
+            #     continue
             try:
                 award_words.remove('-')
                 award_words.remove('or')
@@ -259,49 +269,54 @@ def get_presenters(year):
                     if word == "television":
                         award_words.remove("television")
                         if any([kw in tweet for kw in television_synonyms]):
+                            if all([kw in tweet for kw in award_words]): # maybe an any or a cutoff %
+                                t = nlp(tweet)
+                                for person in t.ents:
+                                    if person.label_ == "PERSON":
+                                        if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
+                                            poss_host = person.text.lower()
+                                            # if verify_person(poss_host):
+                                            if poss_host not in test_awards_dict[award]:
+                                                test_awards_dict[award][poss_host] = 1
+                                            else:
+                                                test_awards_dict[award][poss_host] += 1
+                    elif word == "motion":
+                        award_words.remove('motion')
+                        if any([kw in tweet for kw in motion_picture_synonyms]):
                             if all([kw in tweet for kw in award_words]):
                                 t = nlp(tweet)
                                 for person in t.ents:
                                     if person.label_ == "PERSON":
                                         if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
                                             poss_host = person.text.lower()
+                                            # if verify_person(poss_host):
                                             if poss_host not in test_awards_dict[award]:
                                                 test_awards_dict[award][poss_host] = 1
                                             else:
                                                 test_awards_dict[award][poss_host] += 1
-    # prints out the presenters for each award
-    {k: v for k, v in sorted(test_awards_dict["best television series - musical or comedy"].items(), key=lambda item: item[1])}
-    for award in test_awards_dict: # print two top presenters
+                    elif word=="cecil":
+                        t = nlp(tweet)
+                        for person in t.ents:
+                            if person.label_ == "PERSON":
+                                if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
+                                    poss_host = person.text.lower()
+                                    # if verify_person(poss_host):
+                                    if poss_host not in test_awards_dict[award]:
+                                        test_awards_dict[award][poss_host] = 1
+                                    else:
+                                        test_awards_dict[award][poss_host] += 1    
+                
+                
+    for award in test_awards_dict:
+        {k: v for k, v in sorted(test_awards_dict[award].items(), key=lambda item: item[1])}
         i = 0
-        for presenter in test_awards_dict[award]:
-            print(award, presenter)
-            i+=1
+        for key in test_awards_dict[award]:
+            presenters[award].append(key)
+            i += 1
             if i == 2:
                 break
-            
-                                            # else:
-                                            #     test_awards_dict[award]
-                    # elif word == "picture":
-                    #     award_words.remove("picture")
-                    #     if any([kw in tweet for kw in motion_picture_synonyms]):
-                    #         if all([kw in tweet for kw in award_words]):
-                    #             t = nlp(tweet)
-                    #             for person in t.ents:
-                    #                 if person.label_ == "PERSON":
-                    #                     if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
-                    #                         poss_host = person.text.lower()
-                    #                         if poss_host not in presenters_final:
-                    #                             presenters_final[poss_host] = 1
-                    #                         else:
-                    #                             presenters_final[poss_host] += 1
-    # {k: v for k, v in sorted(test_awards_dict.items(), key=lambda item: item[1])}
-    # i = 0
-    # for presenter in test_awards_dict: # print two top presenters
-    #     print(presenter, test_awards_dict[presenter])
-    #     i+=1
-    #     if i == 2:
-    #         break
-
+    print(presenters)
+    
     return presenters
 
 def pre_ceremony():
