@@ -15,11 +15,18 @@ import spacy
 
 from helper_functions import *
 
+from fuzzywuzzy import fuzz
+
+
 
 def get_hosts(year):
     '''Hosts is a list of one or more strings. Do NOT change the name
     of this function or what it returns.'''
     # Your code here
+    '''
+    {'2013': {'hosts': {'completeness': 1.0, 'spelling': 1.0}},
+    '2015': {'hosts': {'completeness': 1.0, 'spelling': 1.0}}}
+    '''
 
 
     FILE_NAME = "gg"+ str(year) + ".json"
@@ -45,7 +52,7 @@ def get_hosts(year):
 
     hosts = []
     for candidate in list(counts.index):
-        if verify_person(candidate):
+        if strict_verify_person(candidate):
             if candidate not in hosts:
                 hosts.append(candidate)
         if len(hosts) >= 2:
@@ -60,6 +67,12 @@ def get_awards(year):
     '''Awards is a list of strings. Do NOT change the name
     of this function or what it returns.'''
     # Your code here
+    '''
+    {'2013': {'awards': {'completeness': 0.187, 'spelling': 0.8313574982100284}},
+     '2015': {'awards': {'completeness': 0.2756756756756757,
+                         'spelling': 0.8083238461538619}}}
+    '''
+
 
     FILE_NAME = "gg"+ str(year) + ".json"
 
@@ -102,7 +115,7 @@ def get_awards(year):
         # if len(candidate.split()) <= 11 and len(candidate.split()) > 3:
         #     if candidate not in awards:
         if "best" in candidate.split()[0] or "award" in candidate.split()[-1]:
-            if candidate not in awards:
+            if candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards]):
                 awards.append(candidate)
         # if "actress" in candidate:
         #     inverse = candidate.replace("actress", "actor")
@@ -112,7 +125,6 @@ def get_awards(year):
         #     inverse = candidate.replace("actor", "actress")
         #     if inverse not in awards:
         #         awards.append(inverse)
-
     print(awards)
 
     return awards
@@ -133,6 +145,10 @@ def get_winner(year):
     '''Winners is a dictionary with the hard coded award
     names as keys, and each entry containing a single string.
     Do NOT change the name of this function or what it returns.'''
+    '''
+    {'2013': {'winner': {'spelling': 0.6923076923076923}},
+    '2015': {'winner': {'spelling': 0.7692307692307693}}}
+    '''
     # Your code here
     if year == "2013" or year == "2015":
         winners = {award: "" for award in OFFICIAL_AWARDS_1315}
@@ -168,8 +184,8 @@ def get_winner(year):
         candidates = df_goes_groups[~df_goes_groups[2].isnull()][[2]]
 
         candidates.columns = ["won"]
-        # candidates["won"] = candidates['won'].str.replace('[^\w\s]','')
         candidates["won"] = candidates.apply(func= lambda row: row['won'].split('for')[0], axis=1)
+        # candidates["won"] = candidates['won'].str.replace('[^\w\s]','')
 
         # candidates = candidates[candidates["goes"].str.contains('$award|^best')]
         candidates["won_len"] = candidates["won"].str.split().apply(len)
@@ -380,6 +396,10 @@ def extra_credit(year):
 
 
 
+    # Sentiment Analysis of Host
+
+
+
 def main():
     '''This function calls your program. Typing "python gg_api.py"
     will run this function. Or, in the interpreter, import gg_api
@@ -389,13 +409,7 @@ def main():
     # Your code here
 
     # get_winner(2020)
-<<<<<<< HEAD
-    extra_credit(2015)
 
-=======
-    #get_awards(2020)
-    get_presenters(2020)
->>>>>>> 5aeca9df05755072467851d594f07b9fc17c0aa9
     return
 
 if __name__ == '__main__':
