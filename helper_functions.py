@@ -15,9 +15,10 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 
+from textblob import TextBlob
+
 
 NOT_USEFUL_NOUNS = set()
-
 NOT_USEFUL_NOUNS.add("the golden globes")
 NOT_USEFUL_NOUNS.add("golden globes")
 NOT_USEFUL_NOUNS.add("goldenglobes")
@@ -58,6 +59,19 @@ LIMITED_SERIES = 3
 NONE = 0
 DRAMA = 1
 COMEDY = 2
+
+
+def average_std_sentiment(df_series):
+    series = df_series.apply(func= lambda text: TextBlob(text).sentiment)
+    print(series)
+    print(type(series))
+    print(series[0])
+    return 0, 1
+    return series.mean(), series.std()
+
+def should_add_award(candidate, awards):
+    return candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards])
+
 
 def get_query_dict(award_name):
     # Returns query string AND if the award has "weird" noun structure (True if it weird noun)
