@@ -220,90 +220,52 @@ def get_presenters(year):
     except:
         df = pd.read_json(FILE_NAME, lines=True)
 
-    print(list(df))
+    # print(list(df))
 
-    # holds some of the awards so I can just test a few at a time
-
-    television_synonyms = ["television", "tv", "television series", "tv series", "television show", "tv show"]
-    motion_picture_synonyms = ["motion picture", "movie", "film"]
     nlp = spacy.load("en_core_web_sm")
 
-    test_awards_dict = {award: {} for award in presenters} # need to change to presenters later
-    #presenter_words = ['present', 'gave', 'giving', 'give', 'announce', 'read', 'introduce', 'host', 'will host']
+    #test_awards_dict = {award: {} for award in presenters} # need to change to presenters later
+    presenter_words = ['presented by', 'present', 'gave', 'giving', 'give', 'announce', 'read', 'introduce', 'host', 'will host']
+    # 1 function to finding mention of award in tweet
+                # can reuse presenters and winners and nominations
+    # 1 to find that there is a presenter in the tweet, this one, find presented by and do t = nlp stuff but no validation for if it's with an award
+    # get that identification of award for winners and get what words/expressions work
+        # try to get precision
+    #LOOK HOW ANDONG EXTRACTED AWARDS FROM TWEETS AND TRY TO REUSE WITH THIS  
+    # try words like present/presented by -> or even regular expressions
+    #   try first with awards i know will work then go from there
+    # can start with likes ~150 where we filter df and make a base of tweets that have presented by in it
+        # try to get very high accuracy first then coverage later 
 
-    # filter tweets by presenter_words
-        # do if re.search(next year...)
-            # if word=='television' and everything after taht 
-                #-> allow me to affiliate presenters with awards
+    # don't need to split it up by tv/movies etc and don't need to do for word in award, just get all people then try to extract awards later
+    # get proper nouns with post tiger (in slides) (or our way is fine too) and use our verify person part
+    
+    # df["text"] = df["text"].str.lower()
+    # df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
+    # df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
+    # df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
 
-    # do same thing as github but extract prsetner is just nlp with ents
+    presenter_list = []
 
-    # kind of working...
-    # imdb check is making it a lot slower
     for tweet in df['text']:
-        tweet = tweet.lower()
-        for award in presenters:
-            award_words = award.split()
-            # may want to add re_presenters here
-            # if "represent" in award_words or "representation" in award_words or "next year" in award_words or "last year" in award_words:
-            #     continue
-            try:
-                award_words.remove('-')
-                award_words.remove('or')
-            except:
-                pass
-            if re.search('(next year|last year|representation)', tweet) is None: # need to find phrases like these
-                for word in award_words:
-                    if word == "television":
-                        award_words.remove("television")
-                        if any([kw in tweet for kw in television_synonyms]):
-                            if all([kw in tweet for kw in award_words]): # maybe an any or a cutoff %
-                                t = nlp(tweet)
-                                for person in t.ents:
-                                    if person.label_ == "PERSON":
-                                        if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
-                                            poss_host = person.text.lower()
-                                            # if verify_person(poss_host):
-                                            if poss_host not in test_awards_dict[award]:
-                                                test_awards_dict[award][poss_host] = 1
-                                            else:
-                                                test_awards_dict[award][poss_host] += 1
-                    elif word == "motion":
-                        award_words.remove('motion')
-                        if any([kw in tweet for kw in motion_picture_synonyms]):
-                            if all([kw in tweet for kw in award_words]):
-                                t = nlp(tweet)
-                                for person in t.ents:
-                                    if person.label_ == "PERSON":
-                                        if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
-                                            poss_host = person.text.lower()
-                                            # if verify_person(poss_host):
-                                            if poss_host not in test_awards_dict[award]:
-                                                test_awards_dict[award][poss_host] = 1
-                                            else:
-                                                test_awards_dict[award][poss_host] += 1
-                    elif word=="cecil":
-                        t = nlp(tweet)
-                        for person in t.ents:
-                            if person.label_ == "PERSON":
-                                if person.text not in ["Golden Globes", "GG", "GoldenGlobes", "golden globes", "goldenglobes", "goldenglobes2020"]:
-                                    poss_host = person.text.lower()
-                                    # if verify_person(poss_host):
-                                    if poss_host not in test_awards_dict[award]:
-                                        test_awards_dict[award][poss_host] = 1
-                                    else:
-                                        test_awards_dict[award][poss_host] += 1    
+        if re.search('(next year|last year|representation)', tweet) is None: # need to find phrases like these
+        # use expressions that get the correct results rathe than the complete results
+            # get something that consistently gets all answers so maybe not use presenter_words
+            for i in presenter_words:
+                if i in tweet:
+                    splitTweet = tweet.split(i) # can change this phrase
+                    presenterPart = splitTweet[1]
+                    t = nlp(presenterPart)
+                    for person in t.ents:
+                        if person.label_ == "PERSON":
+                            if verify_person(person.text.lower()) and person.text.lower() not in ['golden globes', 'goldenglobes', 'gg']:
+                                presenter_list.append(person.text.lower())
+                                # eventually will extract the awards and presenters from here
+
+    
                 
-                
-    for award in test_awards_dict:
-        {k: v for k, v in sorted(test_awards_dict[award].items(), key=lambda item: item[1])}
-        i = 0
-        for key in test_awards_dict[award]:
-            presenters[award].append(key)
-            i += 1
-            if i == 2:
-                break
-    print(presenters)
+    # extract presenters -> add them and awaards to presenters
+    print(presenter_list)
     
     return presenters
 
@@ -404,13 +366,9 @@ def main():
     # Your code here
 
     # get_winner(2020)
-<<<<<<< HEAD
-    extra_credit(2015)
-
-=======
+    #extra_credit(2015)
     #get_awards(2020)
     get_presenters(2020)
->>>>>>> 5aeca9df05755072467851d594f07b9fc17c0aa9
     return
 
 if __name__ == '__main__':
