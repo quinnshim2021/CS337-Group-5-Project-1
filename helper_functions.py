@@ -15,9 +15,10 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 
+from textblob import TextBlob
+
 
 NOT_USEFUL_NOUNS = set()
-
 NOT_USEFUL_NOUNS.add("the golden globes")
 NOT_USEFUL_NOUNS.add("golden globes")
 NOT_USEFUL_NOUNS.add("goldenglobes")
@@ -59,11 +60,22 @@ NONE = 0
 DRAMA = 1
 COMEDY = 2
 
-def should_add_award(candidate, awards):
-    return candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards])
 
 def should_add_candidate(candidate, candidate_list):
     return candidate not in candidate_list and not any([fuzz.token_set_ratio(candidate, candidate_i) == 100 for candidate_i in candidate_list])
+
+
+def average_std_sentiment(df_series):
+    series = df_series.apply(func= lambda text: TextBlob(text).sentiment)
+    print(series)
+    print(type(series))
+    print(series[0])
+    return 0, 1
+    return series.mean(), series.std()
+
+def should_add_award(candidate, awards):
+    return candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards])
+
 
 def get_query_dict(award_name):
     # Returns query string AND if the award has "weird" noun structure (True if it weird noun)
@@ -192,6 +204,9 @@ def verify_person(person_name, threshold=60):
             return highest[0]
     return None
 
+def strict_verify_person(person_name):
+    return any([person_name == person["name"].lower() for person in IA.search_person(person_name)])
+
 
 def verify_film_tv(title, medium, year, threshold=60):
     movies = IA.search_movie(title)
@@ -227,14 +242,3 @@ def verify_film_tv(title, medium, year, threshold=60):
 OFFICIAL_AWARDS_1315 = ['cecil b. demille award', 'best motion picture - drama', 'best performance by an actress in a motion picture - drama', 'best performance by an actor in a motion picture - drama', 'best motion picture - comedy or musical', 'best performance by an actress in a motion picture - comedy or musical', 'best performance by an actor in a motion picture - comedy or musical', 'best animated feature film', 'best foreign language film', 'best performance by an actress in a supporting role in a motion picture', 'best performance by an actor in a supporting role in a motion picture', 'best director - motion picture', 'best screenplay - motion picture', 'best original score - motion picture', 'best original song - motion picture', 'best television series - drama', 'best performance by an actress in a television series - drama', 'best performance by an actor in a television series - drama', 'best television series - comedy or musical', 'best performance by an actress in a television series - comedy or musical', 'best performance by an actor in a television series - comedy or musical', 'best mini-series or motion picture made for television', 'best performance by an actress in a mini-series or motion picture made for television', 'best performance by an actor in a mini-series or motion picture made for television', 'best performance by an actress in a supporting role in a series, mini-series or motion picture made for television', 'best performance by an actor in a supporting role in a series, mini-series or motion picture made for television']
 OFFICIAL_AWARDS_1819 = ['best motion picture - drama', 'best motion picture - musical or comedy', 'best performance by an actress in a motion picture - drama', 'best performance by an actor in a motion picture - drama', 'best performance by an actress in a motion picture - musical or comedy', 'best performance by an actor in a motion picture - musical or comedy', 'best performance by an actress in a supporting role in any motion picture', 'best performance by an actor in a supporting role in any motion picture', 'best director - motion picture', 'best screenplay - motion picture', 'best motion picture - animated', 'best motion picture - foreign language', 'best original score - motion picture', 'best original song - motion picture', 'best television series - drama', 'best television series - musical or comedy', 'best television limited series or motion picture made for television', 'best performance by an actress in a limited series or a motion picture made for television', 'best performance by an actor in a limited series or a motion picture made for television', 'best performance by an actress in a television series - drama', 'best performance by an actor in a television series - drama', 'best performance by an actress in a television series - musical or comedy', 'best performance by an actor in a television series - musical or comedy', 'best performance by an actress in a supporting role in a series, limited series or motion picture made for television', 'best performance by an actor in a supporting role in a series, limited series or motion picture made for television', 'cecil b. demille award']
 
-
-
-# import pprint
-
-# pp = pprint.PrettyPrinter(indent=4)
-
-
-# pp.pprint([make_award_dict(award) for award in OFFICIAL_AWARDS_1315])
-
-
-# pp.pprint([make_award_dict(award) for award in OFFICIAL_AWARDS_1819])
