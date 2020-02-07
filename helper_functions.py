@@ -61,6 +61,10 @@ DRAMA = 1
 COMEDY = 2
 
 
+def should_add_candidate(candidate, candidate_list):
+    return candidate not in candidate_list and not any([fuzz.token_set_ratio(candidate, candidate_i) == 100 for candidate_i in candidate_list])
+
+
 def average_std_sentiment(df_series):
     series = df_series.apply(func= lambda text: TextBlob(text).sentiment)
     print(series)

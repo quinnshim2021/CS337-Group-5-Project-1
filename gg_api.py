@@ -8,6 +8,7 @@ OFFICIAL_AWARDS_1819 = ['best motion picture - drama', 'best motion picture - mu
 
 import pandas as pd
 import re
+from collections import Counter
 
 #
 import spacy
@@ -133,13 +134,105 @@ def get_nominees(year):
     '''Nominees is a dictionary with the hard coded award
     names as keys, and each entry a list of strings. Do NOT change
     the name of this function or what it returns.'''
+
+# {'2013': {'nominees': {'completeness': 0.015380952380952379,
+#                        'spelling': 0.09166666666666667}}}
+
     # Your code here
+    ### create a subset of nominees with word "nominee" and then from that subset extract the award names an
     if year == "2013" or year == "2015":
         nominees = {award: [] for award in OFFICIAL_AWARDS_1315}
     else:
         nominees = {award: [] for award in OFFICIAL_AWARDS_1819}
 
+    awards_dict = {award: make_award_dict(award) for award in list(nominees.keys())}
+    ### need to call get winners. Make sure that the nominees that I am finding are not in the winners
+    FILE_NAME = "gg"+ str(year) + ".json"
+
+    try:
+        df = pd.read_json(FILE_NAME)
+    except:
+        df = pd.read_json(FILE_NAME, lines=True)
+
+    winners = get_winner(year)  ### Make sure nominee is not in this list
+   
+    df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
+    df['text'] = df['text'].str.replace('#GoldenGlobes', '', case=False)
+    df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
+    df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
+    df['text'] = df['text'].str.replace('#', '', case=False)
+    df['text'] = df['text'].str.replace('Golden Globes', '', case=False)
+    df['text'] = df['text'].str.replace('Congratulations', '', case=False)
+    df['text'] = df['text'].str.replace('Golden Globe', '', case=False)
+    df['text'] = df['text'].str.replace('Congrats', '', case=False)
+    df['text'] = df['text'].str.replace('Nshowbiz', '', case=False)
+    df['text'] = df['text'].str.replace('The', '', case=False)
+    df['text'] = df['text'].str.replace('And', '', case=False)
+    df['text'] = df['text'].str.replace('Congrats', '', case=False)
+    df['text'] = df['text'].str.replace('Another', '', case=False)
+    # df['text'] = df['text'].str.replace('Go On', '', case=False)
+    df['text'] = df['text'].str.replace('OMG', '', case=False)
+    df['text'] = df['text'].str.replace('Globe', '', case=False)
+    df['text'] = df['text'].str.replace('Golden', '', case=False)
+    df['text'] = df['text'].str.replace('Wow', '', case=False)
+    df['text'] = df['text'].str.replace('Variety', '', case=False)
+    df['text'] = df['text'].str.replace('Latest', '', case=False)
+    df['text'] = df['text'].str.replace('Golden', '', case=False)
+
+
+
+
+    # df_base = df[df["text"].str.contains('nominated|nominated for|nominee|nominees')]
+    
+    
+    for award_name, award_dict in awards_dict.items():
+        df1 = get_award_tweets(df, award_dict)
+        df_pronouns = df1["text"].str.extractall('([A-Z][a-z]+(?=\s[A-Z])(?:\s[A-Z][a-z]+)+)') 
+        df_temp = df1["text"].str.extractall('([A-Z][a-z]+)')
+        df_pronouns = df_pronouns.append(df_temp)
+
+        candidates = df_pronouns[~df_pronouns[0].isnull()][[0]]
+        candidates.columns = ["nominee"]
+        candidates["nominee"] = candidates["nominee"].str.lower()
+        candidates["nominee_len"] = candidates["nominee"].str.split().apply(len)
+        candidates = candidates[candidates["nominee_len"] <= 8]
+        counts = candidates["nominee"].value_counts(ascending=False)
+        # print(award_name)
+        # print(counts)
+        nominee = []
+        count = 0
+        candidates = list(counts.index)
+        for i in range(len(candidates)):
+            # if counts.values[count] < 2:
+            #     break
+            if count == 4:
+                break
+            elif award_dict["weird_noun"]:
+                 # GOTTA EMBED HERE IF A THING OR IF A PERSON
+                answer = verify_film_tv(candidates[i], award_dict["medium"], year)
+                if answer:
+                    if answer != winners[award_name]:
+                        if should_add_candidate(answer, candidates[i+1:]):
+                            print(f"{answer} is a nominee of the award")
+                            nominee.append(answer)
+                            count += 1
+                            
+            else:
+                  # GOTTA EMBED HERE IF A THING OR IF A PERSON
+                answer = verify_person(candidates[i])
+                if answer:
+                    if answer != winners[award_name]:
+                        if should_add_candidate(answer, candidates[i+1:]):
+                            print(f"{answer} is a nominee of the award")
+                            nominee.append(answer)
+                            count += 1
+            # count += 1          
+        # temp = Counter(nominee)
+        # nominee = list(list(zip(*(temp.most_common(4))))[0])
+        nominees[award_name] = nominee
+    print(nominees)
     return nominees
+
 
 def get_winner(year):
     '''Winners is a dictionary with the hard coded award
@@ -166,14 +259,15 @@ def get_winner(year):
     except:
         df = pd.read_json(FILE_NAME, lines=True)
 
-    print(list(df))
+    # print(list(df))
 
-    df["text"] = df["text"].str.lower()
+    df['text'] = df['text'].str.lower()
     df['text'] = df['text'].str.replace('http\S+|www.\S+', '', case=False)
     df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
     df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
+    
 
-    df_base = df[df["text"].str.contains('win|won|goes to')]
+    df_base = df[df['text'].str.contains('win|won|goes to')]
 
     for award_name, award_dict in awards_dict.items():
 
@@ -182,6 +276,7 @@ def get_winner(year):
         df_goes = df1[df1["text"].str.contains('goes to')]
         df_goes_groups = df_goes["text"].str.extract('([^,]+) (goes to) ([^,]+)')
         candidates = df_goes_groups[~df_goes_groups[2].isnull()][[2]]
+        # print(candidates)
 
         candidates.columns = ["won"]
         candidates["won"] = candidates.apply(func= lambda row: row['won'].split('for')[0], axis=1)
@@ -192,7 +287,7 @@ def get_winner(year):
         candidates = candidates[candidates["won_len"] <= 8]
         counts = candidates["won"].value_counts(ascending=False)
 
-        print(counts)
+        # print(counts)
 
         winner = ""
         for candidate in list(counts.index):
@@ -201,20 +296,20 @@ def get_winner(year):
                  # GOTTA EMBED HERE IF A THING OR IF A PERSON
                 answer = verify_film_tv(candidate, award_dict["medium"], year)
                 if answer:
-                    print(f"{answer} is the winner of the award")
+                    # print(f"{answer} is the winner of the award")
                     winner = answer
                     break
             else:
                   # GOTTA EMBED HERE IF A THING OR IF A PERSON
                 answer = verify_person(candidate)
                 if answer:
-                    print(f"{answer} is the winner of the award")
+                    # print(f"{answer} is the winner of the award")
                     winner = answer
                     break          
 
         winners[award_name] = winner
 
-    print(winners)
+    # print(winners)
     return winners
 
 def get_presenters(year):
@@ -434,7 +529,16 @@ def main():
     what it returns.'''
     # Your code here
 
-    #get_winner(2020)
+
+    # get_winner(2013)
+
+    # extra_credit(2015)
+
+    #get_awards(2020)
+    # get_presenters(2020)
+    get_nominees(2013)
+
+    # get_winner(2020)
     #extra_credit(2015)
     #get_awards(2020)
     get_presenters(2020)
