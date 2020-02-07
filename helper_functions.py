@@ -59,6 +59,12 @@ NONE = 0
 DRAMA = 1
 COMEDY = 2
 
+def should_add_award(candidate, awards):
+    return candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards])
+
+def should_add_candidate(candidate, candidate_list):
+    return candidate not in candidate_list and not any([fuzz.token_set_ratio(candidate, candidate_i) == 100 for candidate_i in candidate_list])
+
 def get_query_dict(award_name):
     # Returns query string AND if the award has "weird" noun structure (True if it weird noun)
 
