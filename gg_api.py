@@ -3,19 +3,14 @@
 OFFICIAL_AWARDS_1315 = ['cecil b. demille award', 'best motion picture - drama', 'best performance by an actress in a motion picture - drama', 'best performance by an actor in a motion picture - drama', 'best motion picture - comedy or musical', 'best performance by an actress in a motion picture - comedy or musical', 'best performance by an actor in a motion picture - comedy or musical', 'best animated feature film', 'best foreign language film', 'best performance by an actress in a supporting role in a motion picture', 'best performance by an actor in a supporting role in a motion picture', 'best director - motion picture', 'best screenplay - motion picture', 'best original score - motion picture', 'best original song - motion picture', 'best television series - drama', 'best performance by an actress in a television series - drama', 'best performance by an actor in a television series - drama', 'best television series - comedy or musical', 'best performance by an actress in a television series - comedy or musical', 'best performance by an actor in a television series - comedy or musical', 'best mini-series or motion picture made for television', 'best performance by an actress in a mini-series or motion picture made for television', 'best performance by an actor in a mini-series or motion picture made for television', 'best performance by an actress in a supporting role in a series, mini-series or motion picture made for television', 'best performance by an actor in a supporting role in a series, mini-series or motion picture made for television']
 OFFICIAL_AWARDS_1819 = ['best motion picture - drama', 'best motion picture - musical or comedy', 'best performance by an actress in a motion picture - drama', 'best performance by an actor in a motion picture - drama', 'best performance by an actress in a motion picture - musical or comedy', 'best performance by an actor in a motion picture - musical or comedy', 'best performance by an actress in a supporting role in any motion picture', 'best performance by an actor in a supporting role in any motion picture', 'best director - motion picture', 'best screenplay - motion picture', 'best motion picture - animated', 'best motion picture - foreign language', 'best original score - motion picture', 'best original song - motion picture', 'best television series - drama', 'best television series - musical or comedy', 'best television limited series or motion picture made for television', 'best performance by an actress in a limited series or a motion picture made for television', 'best performance by an actor in a limited series or a motion picture made for television', 'best performance by an actress in a television series - drama', 'best performance by an actor in a television series - drama', 'best performance by an actress in a television series - musical or comedy', 'best performance by an actor in a television series - musical or comedy', 'best performance by an actress in a supporting role in a series, limited series or motion picture made for television', 'best performance by an actor in a supporting role in a series, limited series or motion picture made for television', 'cecil b. demille award']
 
-
-
-
 import pandas as pd
 import re
 
-#
 import spacy
-#
 
 from helper_functions import *
 
-from fuzzywuzzy import fuzz
+
 
 
 
@@ -30,9 +25,12 @@ def get_hosts(year):
 
 
     FILE_NAME = "gg"+ str(year) + ".json"
-    cutoff = 0.50
+    cutoff = 0.60
 
-    df = pd.read_json(FILE_NAME)
+    try:
+        df = pd.read_json(FILE_NAME)
+    except:
+        df = pd.read_json(FILE_NAME, lines=True)
 
     print(list(df))
 
@@ -52,7 +50,8 @@ def get_hosts(year):
 
     hosts = []
     for candidate in list(counts.index):
-        if strict_verify_person(candidate):
+
+        if len(candidate.split()) > 1 and strict_verify_person(candidate):
             if candidate not in hosts:
                 hosts.append(candidate)
         if len(hosts) >= 2:
@@ -115,7 +114,7 @@ def get_awards(year):
         # if len(candidate.split()) <= 11 and len(candidate.split()) > 3:
         #     if candidate not in awards:
         if "best" in candidate.split()[0] or "award" in candidate.split()[-1]:
-            if candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards]):
+            if should_add_award(candidate, award):
                 awards.append(candidate)
         # if "actress" in candidate:
         #     inverse = candidate.replace("actress", "actor")
@@ -173,13 +172,13 @@ def get_winner(year):
     df['text'] = df['text'].str.replace('#goldenglobes', '', case=False)
     df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
 
-    df_base = df[df["text"].str.contains('win|won|goes to')]
+    df_base = df[df["text"].str.contains('goes to')]
 
     for award_name, award_dict in awards_dict.items():
 
         df1 = get_award_tweets(df_base, award_dict)
 
-        df_goes = df1[df1["text"].str.contains('goes to')]
+        # df_goes = df1[df1["text"].str.contains('goes to')]
         df_goes_groups = df_goes["text"].str.extract('([^,]+) (goes to) ([^,]+)')
         candidates = df_goes_groups[~df_goes_groups[2].isnull()][[2]]
 
@@ -361,22 +360,40 @@ def extra_credit(year):
     df_awards["award_part"] = df_awards.apply(func= lambda row: row['award_part'].split(' for ')[0], axis=1)
     df_awards = df_awards[df_awards["award_part"].str.contains('$award|^best')]
 
-    # Best dressed
-    df_dressed = df_awards[df_awards["award_part"].str.contains('dress|outfit')]
-    df_dressed["winner"] = df_dressed.apply(func= lambda row: verify_person(row['winner_part'], threshold=50), axis=1)
-    df_dressed = df_dressed[~df_dressed["winner"].isnull()] 
+    print(df_awards.shape)
+    print(df_awards.columns)
 
-    counts = df_dressed["winner"].value_counts(ascending=False)
+    # Best dressed
+
+    df_dressed = df_awards[df_awards["award_part"].str.contains('dress|outfit')]
+    if df_dressed.shape[0] > 0:
+        df_dressed["winner"] = df_dressed.apply(func= lambda row: verify_person(row['winner_part'], threshold=50), axis=1)
+        df_dressed = df_dressed[~df_dressed["winner"].isnull()] 
+
+        counts = df_dressed["winner"].value_counts(ascending=False)
+
+    else:
+        cutoff = 0.50
+        df_dressed = df[df["text"].str.contains('dress|outfit')]
+        print(df_dressed.shape)
+        print(df_dressed.columns)
+
+        dressed_col = df_dressed.apply(func= lambda row: get_chunks(row["text"]), axis=1)
+        counts = make_counts(dressed_col)
+        counts = counts[counts >= max(counts) * cutoff]
 
     print(counts)
 
-    best_dressed = ""
+    best_dressed = []
     for candidate in list(counts.index):
-        answer = verify_person(candidate)
-        if answer:
-            print(f"{answer} is the winner of the award")
-            best_dressed = answer
-            break          
+        if verify_person(candidate, threshold=0.80):
+            if candidate not in best_dressed:
+                best_dressed.append(candidate)
+        if len(best_dressed) >= 2:
+            break
+
+    print(best_dressed)
+
 
     # Best Speech
     df_speech = df_awards[df_awards["award_part"].str.contains('speech')]
@@ -406,12 +423,32 @@ def extra_credit(year):
     df_awards["winner"] = df_awards.apply(func= lambda row: verify_person(row['winner_part'], threshold=50), axis=1)
     df_awards = df_awards[~df_awards["winner"].isnull()]  
 
+    extra_awards = {}
+    for row in df_awards.iterrows():
+        # if len(candidate.split()) <= 11 and len(candidate.split()) > 3:
+        #     if candidate not in awards:
+        if should_add_award(row["award_part"], list(extra_awards.keys())):
+            extra_awards[row["award_part"]] = row["winner"]
+
     print(df_awards)
     print(df_awards.shape)
 
-
-
     # Sentiment Analysis of Host
+    hosts = get_hosts(year)
+
+    host_sentiments = {host: {"mean": None, "std": None} for host in hosts}
+
+    print(hosts)
+
+    for host in hosts:
+        df_col = df[df["text"].str.contains(host)]["text"]
+        # print(df_col)
+        stats = sentiment_stats(df_col)
+        print(stats)
+        print("hola")
+        
+
+    print(hosts)
 
 
 
@@ -424,6 +461,8 @@ def main():
     # Your code here
 
     # get_winner(2020)
+    extra_credit(2015)
+    print("bye")
 
     return
 

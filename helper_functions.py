@@ -61,13 +61,27 @@ DRAMA = 1
 COMEDY = 2
 
 
-def average_std_sentiment(df_series):
-    series = df_series.apply(func= lambda text: TextBlob(text).sentiment)
-    print(series)
-    print(type(series))
-    print(series[0])
-    return 0, 1
-    return series.mean(), series.std()
+def sentiment_stats(df_series):
+    series = df_series.apply(func= lambda text: TextBlob(text).sentiment.polarity)
+    # print(series)
+    # print(type(series))
+    # print(series[0])
+    # return 0, 1
+    ranges = {"very_pos": (0.50, 1.00),
+              "somewat_pos": (0.10, 0.50),
+              "neutral": (-0.10,0.10),
+              "somewhat_neg": (-0.50, -0.10),
+              "very_neg": (-1.00, -0.50)
+              }
+
+    stats = {"num_tweets": series.shape[0],
+             "mean": series.mean(),
+             "std": series.std()}
+
+    for range_name, range_vals in ranges.items():
+        stats[range_name+"_fraction"] = series[(series > range_vals[0]) & (series < range_vals[1])].count() / stats["num_tweets"]
+
+    return stats
 
 def should_add_award(candidate, awards):
     return candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards])
