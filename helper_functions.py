@@ -15,7 +15,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 
-from textblob import TextBlob
+# from textblob import TextBlob
 
 
 NOT_USEFUL_NOUNS = set()
@@ -60,7 +60,6 @@ NONE = 0
 DRAMA = 1
 COMEDY = 2
 
-
 def sentiment_stats(df_series):
     series = df_series.apply(func= lambda text: TextBlob(text).sentiment.polarity)
     # print(series)
@@ -82,6 +81,11 @@ def sentiment_stats(df_series):
         stats[range_name+"_fraction"] = series[(series > range_vals[0]) & (series < range_vals[1])].count() / stats["num_tweets"]
 
     return stats
+
+
+def should_add_candidate(candidate, candidate_list):
+    return candidate not in candidate_list and not any([candidate in candidate_i for candidate_i in candidate_list])
+
 
 def should_add_award(candidate, awards):
     return candidate not in awards and not any([fuzz.token_set_ratio(candidate, award) == 100 for award in awards])
@@ -126,6 +130,46 @@ def get_query_dict(award_name):
         return "(?=.*best)(?=.*animated)", True
     elif "foreign" in award_name:
         return "(?=.*best)(?=.*foreign)", True
+
+def get_query_dict_nominees(award_name):
+    # Returns query string AND if the award has "weird" noun structure (True if it weird noun)
+
+    if "best performance by an actress" in award_name:
+        if "supporting role" in award_name:
+            return "best supporting actress|best actress in supporting role|supporting actress|actress in a supporting role|actress in a supporting role|support actress"
+        else:
+            return "best actress|best performance by an actress|actress|by an actress"
+    elif "best performance by an actor" in award_name:
+        if "supporting role" in award_name:
+            return "best supporting actor|best actor in supporting role|supporting actor|support actor|actor in supporting role|actor in a supporting role"
+        else:
+            return "best actor|best performance by an actor|actor|by an actor"
+    elif "best motion picture" in award_name:
+        if "animated" in award_name:
+            return "animated|animation"
+        elif "foreign" in award_name:
+            return "foreign"
+        else:
+            return "best film|best motion picture|best picture|film|motion picture|picture"
+    elif "best screenplay" in award_name:
+        return "best screenplay|screenplay|screenplayed"
+    elif "director" in award_name:
+        return "director|directed"
+    elif "score" in award_name:
+        return "best score|best original score|score|scored"
+    elif "song" in award_name:
+        return "best song|best original song|song|sang"
+    elif "series" in award_name:
+        if "limited" in award_name or "mini-series" in award_name:
+            return "limited|mini-series|miniseries|television film|motion picture for television"
+        else:
+            return "best television|best series|tv|television|series"
+    elif 'cecil' in award_name:
+        return 'cecil b. demille|cecil|demille'
+    elif "animated" in award_name:
+        return "animated|animation"
+    elif "foreign" in award_name:
+        return "foreign"
 
 
 def get_medium_dict(award_name):
@@ -180,12 +224,25 @@ def get_medium_tweets(df, medium):
     else:
         print(f"medium {medium} not identified, error")
         return df     
+    
+def get_medium_tweets_nominees(df, medium):
+    if medium == FILM:
+        return df[df["text"].str.contains('movie|film|picture')]
+    elif medium == TV:
+        return df[df["text"].str.contains('television|series|show')]
+    elif medium == LIMITED_SERIES:
+        return df[df["text"].str.contains("limited|mini-series|miniseries|television film|motion picture for television")]
+    elif medium == NONE:
+        return df
+    else:
+        print(f"medium {medium} not identified, error")
+        return df   
 
 def get_type_tweets(df, typeof):
     if typeof == DRAMA:
-        return df[df["text"].str.contains('drama')]
+        return df[df["text"].str.contains('drama|dramatic|sad|moving')]
     elif typeof == COMEDY:
-        return df[df["text"].str.contains('comedy|musical')]
+        return df[df["text"].str.contains('comedy|musical|hilarious|funny|music')]
     elif typeof == NONE:
         # Pending (?)
         return df
@@ -201,6 +258,18 @@ def get_award_tweets(df, award):
     # print(df1.shape)
     # print(df1["text"])
     df1 = get_type_tweets(df1, award["typeof"])
+    return df1
+
+def get_award_tweets_nominees(df, award):
+    temp = get_query_dict_nominees(award['string'])
+    # print(award)
+    # print(temp)
+    df1 = df[df["text"].str.contains(temp)]
+    # print(df1.shape)
+    # df1 = get_medium_tweets_nominees(df, award["medium"])
+    # print(df1.shape)
+    # print(df1["text"])
+    # df1 = get_type_tweets(df1, award["typeof"])
     return df1
 
 
