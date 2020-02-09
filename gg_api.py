@@ -12,6 +12,7 @@ from collections import Counter
 
 #
 import spacy
+nlp = spacy.load("en_core_web_sm")
 #
 
 from helper_functions import *
@@ -135,8 +136,10 @@ def get_nominees(year):
     names as keys, and each entry a list of strings. Do NOT change
     the name of this function or what it returns.'''
 
-# {'2013': {'nominees': {'completeness': 0.015380952380952379,
-#                        'spelling': 0.09166666666666667}}}
+# {'2013': {'nominees': {'completeness': 0.034364285714285715,
+#                        'spelling': 0.22833333333333333}},
+#  '2015': {'nominees': {'completeness': 0.052571428571428575,
+#                        'spelling': 0.22833333333333333}}}
 
     # Your code here
     ### create a subset of nominees with word "nominee" and then from that subset extract the award names an
@@ -166,8 +169,8 @@ def get_nominees(year):
     df['text'] = df['text'].str.replace('Golden Globe', '', case=False)
     df['text'] = df['text'].str.replace('Congrats', '', case=False)
     df['text'] = df['text'].str.replace('Nshowbiz', '', case=False)
-    df['text'] = df['text'].str.replace('The', '', case=False)
-    df['text'] = df['text'].str.replace('And', '', case=False)
+    # df['text'] = df['text'].str.replace('The', '', case=False)
+    # df['text'] = df['text'].str.replace('And', '', case=False)
     df['text'] = df['text'].str.replace('Congrats', '', case=False)
     df['text'] = df['text'].str.replace('Another', '', case=False)
     # df['text'] = df['text'].str.replace('Go On', '', case=False)
@@ -178,54 +181,90 @@ def get_nominees(year):
     df['text'] = df['text'].str.replace('Variety', '', case=False)
     df['text'] = df['text'].str.replace('Latest', '', case=False)
     df['text'] = df['text'].str.replace('Golden', '', case=False)
-
-
-
-
-    # df_base = df[df["text"].str.contains('nominated|nominated for|nominee|nominees')]
+    df['text'] = df['text'].str.replace('@', '', case=False)
+    df['text'] = df['text'].str.replace('wtf', '', case=False)
     
-    
+
+    df['text'] = df["text"].str.lower()
     for award_name, award_dict in awards_dict.items():
-        df1 = get_award_tweets(df, award_dict)
-        df_pronouns = df1["text"].str.extractall('([A-Z][a-z]+(?=\s[A-Z])(?:\s[A-Z][a-z]+)+)') 
-        df_temp = df1["text"].str.extractall('([A-Z][a-z]+)')
-        df_pronouns = df_pronouns.append(df_temp)
+        df1 = get_award_tweets_nominees(df, award_dict)
+        df_beat = df1[df1["text"].str.contains('beat|beating|bested|defeated|won against|lost to')]
+        # df1 = df_base[df_base["text"].str.contains('have won|won|win|had won|lost|loses|sad|might have|mentioned')]
+        # print(df1['text'])
 
-        candidates = df_pronouns[~df_pronouns[0].isnull()][[0]]
+        # print(df1['text'])
+        df_beat_groups1 = df_beat["text"].str.extract('([^,]+) (beat|beating|bested|defeated|won against) ([^,]+)')
+        df_beat_groups2 = df_beat["text"].str.extract('([^,]+) (lost to) ([^,]+)')
+        candidates = df_beat_groups1[~df_beat_groups1[2].isnull()][[2]]
+        temp = df_beat_groups2[~df_beat_groups2[0].isnull()][[0]]
+        
         candidates.columns = ["nominee"]
+        candidates['nominee'] = candidates['nominee'].apply(lambda x: [ent.text for ent in list(nlp(x).ents)])
+        candidates['nominee'] = candidates['nominee'].apply(lambda x: None if len(x) is 0 else x[0])
+        candidates = candidates[~candidates['nominee'].isnull()][['nominee']]
+
+        temp.columns = ['nominee']
+        temp['nominee'] = temp['nominee'].apply(lambda x: [ent.text for ent in list(nlp(x).ents)])
+        temp['nominee'] = temp['nominee'].apply(lambda x: None if len(x) is 0 else x[0])
+        temp = temp[~temp['nominee'].isnull()][['nominee']]
+        
+        candidates = candidates.append(temp)
+        
+
+        # candidates = candidates.split()
+        # print(candidates['nominee'])
+
+
+        # temp = pd.Series()
+        # candidates['nominee'] = candidates['nominee'].apply(lambda x: temp.append(pd.Series(x))) 
+        # print(temp)
+        
+  
+
+
+        # df_pronouns = df_beat_groups["text"].str.extractall('([A-Z][a-z]+(?=\s[A-Z])(?:\s[A-Z][a-z]+)+)') 
+        # # df_temp = df1["text"].str.extractall('([A-Z][a-z]+)')
+        # # df_pronouns = df_pronouns.append(df_temp)
+
+        
         candidates["nominee"] = candidates["nominee"].str.lower()
         candidates["nominee_len"] = candidates["nominee"].str.split().apply(len)
         candidates = candidates[candidates["nominee_len"] <= 8]
         counts = candidates["nominee"].value_counts(ascending=False)
-        # print(award_name)
-        # print(counts)
+        print(award_name)
+        print(counts)
         nominee = []
         count = 0
         candidates = list(counts.index)
-        for i in range(len(candidates)):
+        len_candidates = len(candidates)
+        for i in range(len_candidates):
             # if counts.values[count] < 2:
             #     break
             if count == 4:
                 break
             elif award_dict["weird_noun"]:
                  # GOTTA EMBED HERE IF A THING OR IF A PERSON
-                answer = verify_film_tv(candidates[i], award_dict["medium"], year)
+                answer = verify_film_tv(candidates[i], award_dict["medium"], year, threshold=60)
                 if answer:
                     if answer != winners[award_name]:
-                        if should_add_candidate(answer, candidates[i+1:]):
-                            print(f"{answer} is a nominee of the award")
-                            nominee.append(answer)
-                            count += 1
+                        # if should_add_candidate(answer, candidates[i+1:]) and answer not in nominee:
+                        print(f"{answer} is a nominee of the award")
+                        nominee.append(answer)
+                        count += 1
+                        # else:
+                        #     candidates[i] = ''
                             
             else:
                   # GOTTA EMBED HERE IF A THING OR IF A PERSON
-                answer = verify_person(candidates[i])
+                answer = verify_person(candidates[i], threshold=60)
                 if answer:
                     if answer != winners[award_name]:
-                        if should_add_candidate(answer, candidates[i+1:]):
-                            print(f"{answer} is a nominee of the award")
-                            nominee.append(answer)
-                            count += 1
+                        # if should_add_candidate(answer, candidates[i+1:]) and answer not in nominee:
+                        print(f"{answer} is a nominee of the award")
+                        nominee.append(answer)
+                        count += 1
+                        # else:
+                        #     candidates[i] = ''
             # count += 1          
         # temp = Counter(nominee)
         # nominee = list(list(zip(*(temp.most_common(4))))[0])
@@ -492,7 +531,7 @@ def main():
     # get_winner(2020)
     #extra_credit(2015)
     #get_awards(2020)
-    get_presenters(2020)
+    # get_presenters(2020)
     return
 
 if __name__ == '__main__':
