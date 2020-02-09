@@ -18,6 +18,10 @@ from helper_functions import *
 
 from fuzzywuzzy import fuzz
 
+#
+from collections import Counter 
+#
+
 
 
 def get_hosts(year):
@@ -322,8 +326,6 @@ def get_presenters(year):
     else:
         presenters = {award: [] for award in OFFICIAL_AWARDS_1819}
 
-    awards_dict = {award: make_award_dict(award) for award in list(presenters.keys())}
-
     FILE_NAME = "gg"+ str(year) + ".json"
 
     try:
@@ -337,94 +339,64 @@ def get_presenters(year):
     df['text'] = df['text'].str.replace('tv ', 'television ', case=False)
     df['text'] = df['text'].str.replace('@', '', case=False)
     df['text'] = df['text'].str.replace('\'s', '', case=False)
-
-    # print(list(df))
+    df['text'] = df['text'].str.replace('movie', 'motion picture', case=False)
 
     nlp = spacy.load("en_core_web_sm")
 
-    presenter_words = ['presented by', 'present', 'gave', 'giving', 'give', 'announce', 'read', 'introduce', 'will host']
-    noisy_names = ["golden globes", "gg", "goldenglobes", "gg2020", "host", "b.", "cecil", "drama", "movie"]
-    df_base = []
-    # for i in presenter_words:
-    #     df_base.append(df[df["text"].str.contains(i)])
-    for tweet_text in df['text']:
-        presenterPart = ""
-        awardPart = ""
-        p = False
-        for i in presenter_words:
-            if i in tweet_text:
-                presenterPart = tweet_text.split(i)[0]
-                p = True
-                break
-        if not p:
-            continue
-        t = nlp(tweet_text)
-        for person in t.ents:
-            if person.label_ == "PERSON":
-                not_a_name = False
-                for i in noisy_names:
-                    if i in person.text:
-                        not_a_name = True
-                        break
-                if not not_a_name:
-                    for award in presenters:
-                        a = award.replace('best ', '')
-                        a = a.replace(' picture ', ' ')
-                        a = a.replace('-', '')
-                        a = a.replace(' or ', ' ')
-                        a = a.replace(' by an ', ' ')
-                        a = a.replace(' performance ', ' ')
-                        a = a.replace(' in a ', ' ')
-                        a = a.replace(' a ', ' ')
-                        a = a.replace(' featured ', ' ')
-                        a = a.replace(' for ', ' ')
-                        a = a.replace(' series ', ' ')
-                        a = a.replace(' original ', ' ')
-                        a = a.replace(' role ', ' ')
-                        a = a.replace(' language ', ' ')
-                        award_words = a.split()
-                        if all(word in tweet_text.lower() for word in award_words):
-                            if person.text not in presenters[award]:
-                                presenters[award].append(person.text)
-                            break
-                            
-        # else:
-        #     for i in presenter_words:
-        #         if i in tweet_text:
-        #             splitTweet = tweet_text.split(i)
-        #             presenterPart = splitTweet[0]
-        #             t = nlp(presenterPart)
-        #             for person in t.ents:
-        #                 if person.label_ == "PERSON":
-        #                     not_a_name = False
-        #                     for i in noisy_names:
-        #                         if i in person.text:
-        #                             not_a_name = True
-        #                             break
-        #                     if not not_a_name:
-        #                         for award in presenters:
-        #                             a = award.replace('best ', '')
-        #                             a = a.replace(' picture ', ' ')
-        #                             a = a.replace('-', '')
-        #                             a = a.replace(' or ', ' ')
-        #                             a = a.replace(' by an ', ' ')
-        #                             a = a.replace(' performance ', ' ')
-        #                             a = a.replace(' in a ', ' ')
-        #                             a = a.replace(' a ', ' ')
-        #                             a = a.replace(' featured ', ' ')
-        #                             a = a.replace(' for ', ' ')
-        #                             a = a.replace(' series ', ' ')
-        #                             a = a.replace(' original ', ' ')
-        #                             a = a.replace(' role ', ' ')
-        #                             a = a.replace(' language ', ' ')
-        #                             award_words = a.split()
-        #                             if all(word in tweet_text.lower() for word in award_words) and verify_person(person.text):
-        #                                 if person.text not in presenters[award]:
-        #                                     presenters[award].append(person.text)
-        #                                 break
+    presenters_tweets = []
+    presenter_words = ['present', 'presents', 'presenting','presenter','presented' 'Present', 'Presenter', 'Presenting', 'Presented', 'Presents']
+    stopwords = ['goldenglobes', 'golden globes', 'gg', 'gg2020', 'actor', 'actress', 'award', 'cecil', 'movie', 'drama']
+    for tweet in df['text']:
+        if any(word in tweet for word in presenter_words):
+            presenters_tweets.append(tweet)
 
-    # extract presenters -> add them and awaards to presenters
-    print(presenters) 
+    for award in presenters:
+        potential_presenters = {}
+        for pt in presenters_tweets:
+            # filter by award key words to make sure it's award specific
+            if 'actor' in award:
+                if 'actor' not in pt:
+                    continue
+            if 'actress' in award:
+                if 'actress' not in pt:
+                    continue
+            if 'television' in award:
+                if 'television' not in pt and 'tv' not in pt:
+                    continue
+            if 'drama' in award:
+                if 'drama' not in pt:
+                    continue
+            if 'score' in award:
+                if 'score' not in pt and 'song' not in pt:
+                    continue
+            if 'animated' in award:
+                if 'animated' not in pt:
+                    continue
+            if 'musical' in award or 'comedy' in award:
+                if 'musical' not in pt and 'comedy' not in pt:
+                    continue
+            
+            t = nlp(pt)
+            for p in t.ents:
+                if p.label_ == "PERSON":
+                    if 'http' not in p.text:
+                        presenter_names = p.text.split()
+                        g = True
+                        for n in presenter_names or n in stopwords:
+                            if n in presenter_words:
+                                g = False
+                        if g:
+                            if p.text in potential_presenters:
+                                potential_presenters[p.text] += 1
+                            else:
+                                potential_presenters[p.text] = 1
+        # find the most common presenters  
+        k = Counter(potential_presenters)
+        top_two = k.most_common(2)
+        for i in top_two:
+            presenters[award].append(i[0])
+
+    print(presenters)
     return presenters
 
    
@@ -536,7 +508,7 @@ def main():
 
     #get_awards(2020)
     # get_presenters(2020)
-    get_nominees(2013)
+    #get_nominees(2013)
 
     # get_winner(2020)
     #extra_credit(2015)
