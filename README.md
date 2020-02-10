@@ -1,6 +1,8 @@
 # CS337-Group-5-Project-1
 
 
+Code can also be found in github repo: https://github.com/quinnshim2021/CS337-Group-5-Project-1
+
 ## Requirements
 
 Requirements are specified in the requirements.txt file. Note that we use spacy's en_core_web_sm model, so it might be necessary to install it via 
@@ -10,7 +12,7 @@ Requirements are specified in the requirements.txt file. Note that we use spacy'
 
 The main code files for this program are `autograder.py`, `gg_api.py`, and `helper_functions.py`.
 
-To run this program, you just need to run `python autograder.py XXXX` where XXXX is the year of choice. We assume the files "ggXXXX.json" and "ggXXXXanswers.json" are in the same directory as this project.
+To run this program, you just need to run `python autograder.py XXXX` where XXXX is the year of choice. We assume the files "ggXXXX.json" and "ggXXXXanswers.json" are in the same directory as this project. We did not include the 2013 and 2015 files given that they were quite large.
 
 ### Output of Program
 
