@@ -15,7 +15,8 @@ from spacy.lang.en.stop_words import STOP_WORDS
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 
-# from textblob import TextBlob
+from textblob import TextBlob
+import time
 
 
 NOT_USEFUL_NOUNS = set()
@@ -66,19 +67,19 @@ def sentiment_stats(df_series):
     # print(type(series))
     # print(series[0])
     # return 0, 1
-    ranges = {"very_pos": (0.50, 1.00),
-              "somewat_pos": (0.10, 0.50),
-              "neutral": (-0.10,0.10),
-              "somewhat_neg": (-0.50, -0.10),
-              "very_neg": (-1.00, -0.50)
+    ranges = {"Very Positive": (0.50, 1.00),
+              "Somewhat Positive": (0.10, 0.50),
+              "Neutral": (-0.10,0.10),
+              "Somewhat Negative": (-0.50, -0.10),
+              "Very Negative": (-1.00, -0.50)
               }
 
-    stats = {"num_tweets": series.shape[0],
-             "mean": series.mean(),
-             "std": series.std()}
+    stats = {"Number of Tweets": series.shape[0],
+             "Mean Sentiment": series.mean(),
+             "Std Dev Sentiment": series.std()}
 
     for range_name, range_vals in ranges.items():
-        stats[range_name+"_fraction"] = series[(series > range_vals[0]) & (series < range_vals[1])].count() / stats["num_tweets"]
+        stats[range_name+", Fraction of Tweets"] = series[(series > range_vals[0]) & (series < range_vals[1])].count() / stats["Number of Tweets"]
 
     return stats
 
@@ -289,7 +290,6 @@ def strict_verify_person(person_name):
 
 def verify_film_tv(title, medium, year, threshold=60):
     movies = IA.search_movie(title)
-
     # print(movies)
 
     # Filter titles from the same medium
@@ -306,9 +306,6 @@ def verify_film_tv(title, medium, year, threshold=60):
     # Filter titles from the same year (or year before)
     if movies:
         movies = [movie for movie in movies if "year" in movie and movie["year"] == (int(year) - 1)]
-
-
-    # print(movies)
 
     if movies:
         highest = process.extractOne(title, [movie["title"].lower() for movie in movies], scorer=fuzz.token_set_ratio)

@@ -223,19 +223,43 @@ def main(years, grading):
 
 if __name__ == '__main__':
     # years = ['2013', '2015']
-    years = ['2013']
+    
     # grading = ["hosts", "awards", "nominees", "presenters", "winner"]
     # grading = ["hosts"]
-    grading = ["nominees"]
+
+
+    import time
+    start = time.time()
+
+    years = ['2013', '2015']
+    grading = ["hosts", "awards", "nominees", "presenters", "winner"]
+    # grading = [""]
 
     if len(sys.argv) > 1:
         if '2013' in sys.argv:
             years = ['2013']
         elif '2015' in sys.argv:
             years = ['2015']
-
+        elif '2016' in sys.argv:
+            years = ['2016']
+        elif '2017' in sys.argv:
+            years = ['2017']
+        elif '2018' in sys.argv:
+            years = ['2018']
+        elif '2019' in sys.argv:
+            years = ['2019']
+        elif '2020' in sys.argv:
+            years = ['2020']
+            
         newg = [g for g in grading if g in sys.argv]
         if len(newg) > 0:
             grading = newg
 
+    for year in years:
+        gg_api.get_extra_stuff(year)
+        gg_api.print_outputs(year)
+
+
     main(years, grading)
+
+    print('Evertyhing took', time.time()-start, 'seconds.')
