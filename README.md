@@ -8,6 +8,8 @@ Requirements are specified in the requirements.txt file. Note that we use spacy'
 
 ## How to Run
 
+The main code files for this program are `autograder.py`, `gg_api.py`, and `helper_functions.py`.
+
 To run this program, you just need to run `python autograder.py XXXX` where XXXX is the year of choice. We assume the files "ggXXXX.json" and "ggXXXXanswers.json" are in the same directory as this project.
 
 ### Output of Program
